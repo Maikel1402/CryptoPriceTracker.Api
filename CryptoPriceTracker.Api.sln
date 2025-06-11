@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35818.85
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CryptoPriceTracker.Api", "CryptoPriceTracker.Api.csproj", "{31AC9748-4A4F-662F-4925-1C5C8ACD811D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CryptoPriceTracker.Tests", "..\CryptoPriceTracker.Tests\CryptoPriceTracker.Tests.csproj", "{5D7AE962-24CA-43CF-AAB9-43EC85B58116}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{31AC9748-4A4F-662F-4925-1C5C8ACD811D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{31AC9748-4A4F-662F-4925-1C5C8ACD811D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{31AC9748-4A4F-662F-4925-1C5C8ACD811D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{31AC9748-4A4F-662F-4925-1C5C8ACD811D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D7AE962-24CA-43CF-AAB9-43EC85B58116}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D7AE962-24CA-43CF-AAB9-43EC85B58116}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D7AE962-24CA-43CF-AAB9-43EC85B58116}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D7AE962-24CA-43CF-AAB9-43EC85B58116}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C6A5DED9-29DA-4F7D-A547-2FD27B973665}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,173 @@
+@{
+    ViewData["Title"] = "Crypto Price Tracker";
+}
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.2/css/dataTables.dataTables.css" />
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/2.3.2/js/dataTables.js"></script>
+    <style>
+
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8f9fa; }
+        h1 { margin-top: 20px; }
+        .table { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001; }
+        th, td { text-align: center; vertical-align: middle; }
+        th { background: #343a40; color: #fff; }
+        tr:nth-child(even) { background: #f2f2f2; }
+        #updateBtn {
+            margin-bottom: 15px;
+            background: #198754;
+            color: #fff;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #updateBtn:disabled { background: #6c757d; cursor: not-allowed; }
+        #statusMessage { margin: 10px 0 15px 0; font-weight: 500; }
+       
+    </style>
+</head>
+
+<h1>Crypto Price Tracker</h1>
+
+<button id="updateBtn" type="button">
+    <span id="btnText"><i class="fa-solid fa-arrow-rotate-right"></i></span>
+    <span id="btnSpinner" style="display:none;"><i class="fa fa-spinner fa-spin"></i></span>
+</button>
+<div id="statusMessage"></div>
+<table class="table" style="width:100%;overflow-x:auto;">
+    <thead>
+        <tr>
+            <th></th>
+            <th>Name</th>
+            <th>Symbol</th>
+            <th>External Id</th>
+            <th>Price (USD)</th>
+            <th>Last Updated</th>
+            <th>Trend</th>
+        </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
+
+<script>
+    function formatCurrency(value) {
+        return value?.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 8 }) ?? '';
+    }
+
+    function getTrendIcon(trend) {
+        if (trend === 0)
+            return `<i class="fa-solid fa-arrow-trend-up" style="color:green" title="Increased"></i>`;
+        else if (trend === 1)
+            return `<i class="fa-solid fa-arrow-trend-down" style="color:red" title="Decreased"></i>`;
+        else
+            return `<i class="fa-solid fa-equals" style="color:gray" title="No Change"></i>`;
+    }
+
+       $(document).ready(function () {
+        $('.table').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: '/api/crypto/latest-prices',
+                      data: function (d) {
+            return d; // Esto asegura que todos los parámetros como `search[value]`, `start`, `length`, etc., se envíen
+        },
+                dataSrc: 'data'
+
+            },
+            columns: [
+                {
+                    data: 'iconUrl',
+                    render: function (data, type, row) {
+                        return data ? `<img src="${data}" alt="${row.name}" width="25" height="25" style="border-radius:50%;box-shadow:0 1px 4px #0002;"/>` : '';
+                    }
+                },
+                { data: 'name' },
+                { data: 'symbol' },
+                { data: 'externalId' },
+                {
+                    data: 'price',
+                    render: function (data) {
+                        return data?.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 16 }) ?? '';
+                    }
+                },
+                {
+                    data: 'lastUpdated',
+                    render: function (data) {
+                        if (!data) return '';
+                        const date = new Date(data + 'Z');
+                        return date.toLocaleString();
+                    }
+                },
+                {
+                    data: 'trend',
+                    render: function (data) {
+                        if (data === 0)
+                            return `<i class="fa-solid fa-arrow-trend-up" style="color:green" title="Increased"></i>`;
+                        else if (data === 1)
+                            return `<i class="fa-solid fa-arrow-trend-down" style="color:red" title="Decreased"></i>`;
+                        else
+                            return `<i class="fa-solid fa-equals" style="color:gray" title="No Change"></i>`;
+                    }
+                }
+            ],
+            pageLength: 20,
+            lengthMenu: [10, 20, 50, 100],
+            order: [[1, 'asc']]
+        });
+    });
+
+
+           document.getElementById("updateBtn").addEventListener("click", async () => {
+        const btn = document.getElementById("updateBtn");
+        const btnText = document.getElementById("btnText");
+        const btnSpinner = document.getElementById("btnSpinner");
+        btn.disabled = true;
+        btnText.style.display = "none";
+        btnSpinner.style.display = "inline-block";
+        document.getElementById("statusMessage").innerText = "Updating prices...";
+
+        try {
+            // Instancia de la tabla
+            const table = $('.table').DataTable();
+
+            // Para solo la página actual:
+            const currentPageData = table.rows({ page: 'current' }).data().toArray();
+
+            // Si quieres todos los datos filtrados, usa:
+            // const currentPageData = table.rows({ search: 'applied' }).data().toArray();
+
+            if (currentPageData.length === 0) {
+                document.getElementById("statusMessage").innerText = "No hay datos en esta página para actualizar.";
+                return;
+            }
+            const sanitizedData = currentPageData.map(item => ({
+                externalId: item.externalId
+            }));
+
+            const response = await fetch("/api/crypto/update-prices", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(sanitizedData)
+            });
+
+            const data = await response.json();
+            document.getElementById("statusMessage").innerText = data.message;
+            table.ajax.reload(); // Refresca la tabla
+        } catch (e) {
+            console.error(e);
+            document.getElementById("statusMessage").innerText = "❌ Error updating prices.";
+        } finally {
+            btn.disabled = false;
+            btnText.style.display = "inline";
+            btnSpinner.style.display = "none";
+        }
+    });
+
+</script>
