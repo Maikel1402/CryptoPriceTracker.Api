@@ -22,126 +22,148 @@ namespace CryptoPriceTracker.Api.Services
         // I provide these Ids to avoid time out or 406 error from the API.
         public async Task<int> UpdatePricesAsync(List<UpdateDto> externalIds)
         {
-            int updateCont = 0;
-
-            // Fetch new Coins if not already done
-            await SaveNewCoins();
-
-            // Extract the list of external IDs to update
-            var externalIdList = externalIds.Select(x => x.ExternalId).ToList();
-
-            // Get only the assets matching the provided external IDs
-            var cryptoAssets = _dbContext.CryptoAssets
-                .Where(a => externalIdList.Contains(a.ExternalId))
-                .ToList();
-
-            if (!cryptoAssets.Any())
-                return updateCont;
-
-            var ids = string.Join(",", cryptoAssets.Select(a => a.ExternalId));
-            var url = $"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd";
-            var response = await _httpClient.GetAsync(url);
-
-            if (!response.IsSuccessStatusCode)
-                return updateCont;
-
-            var json = await response.Content.ReadAsStringAsync();
-            var prices = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, decimal>>>(json);
-
-            var batchAssetIds = cryptoAssets.Select(a => a.Id).ToList();
-
-            // Get last prices for all assets in this batch in a single query
-            var lastPrices = _dbContext.CryptoPriceHistories
-                .Where(p => batchAssetIds.Contains(p.CryptoAssetId))
-                .GroupBy(p => p.CryptoAssetId)
-                .Select(g => g.OrderByDescending(p => p.Date).FirstOrDefault())
-                .ToDictionary(p => p.CryptoAssetId, p => p);
-
-            foreach (var asset in cryptoAssets)
+            try
             {
-                if (string.IsNullOrEmpty(asset.IconUrl))
-                {
-                    asset.IconUrl = await GetIcon(asset.ExternalId);
-                }
+                int updateCont = 0;
 
-                var today = DateTime.UtcNow.Date;
-                if (lastPrices.TryGetValue(asset.Id, out var lastPrice) && lastPrice != null && lastPrice.Date.Date == today)
-                    continue;
+                // Fetch new Coins if not already done
+                await SaveNewCoins();
 
-                if (prices != null && prices.TryGetValue(asset.ExternalId, out var priceData) && priceData.TryGetValue("usd", out var newPrice) && newPrice > 0)
+                // Extract the list of external IDs to update
+                var externalIdList = externalIds.Select(x => x.ExternalId).ToList();
+
+                // Get only the assets matching the provided external IDs
+                var cryptoAssets = _dbContext.CryptoAssets
+                    .Where(a => externalIdList.Contains(a.ExternalId))
+                    .ToList();
+
+                if (!cryptoAssets.Any())
+                    return updateCont;
+
+                var ids = string.Join(",", cryptoAssets.Select(a => a.ExternalId));
+                var url = $"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd";
+                var response = await _httpClient.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
+                    return updateCont;
+
+                var json = await response.Content.ReadAsStringAsync();
+                var prices = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, decimal>>>(json);
+
+                var batchAssetIds = cryptoAssets.Select(a => a.Id).ToList();
+
+                // Get last prices for all assets in this batch in a single query
+                var lastPrices = _dbContext.CryptoPriceHistories
+                    .Where(p => batchAssetIds.Contains(p.CryptoAssetId))
+                    .GroupBy(p => p.CryptoAssetId)
+                    .Select(g => g.OrderByDescending(p => p.Date).FirstOrDefault())
+                    .ToDictionary(p => p.CryptoAssetId, p => p);
+
+                foreach (var asset in cryptoAssets)
                 {
-                    var priceHistory = new CryptoPriceHistory
+                    if (string.IsNullOrEmpty(asset.IconUrl))
                     {
-                        CryptoAssetId = asset.Id,
-                        Price = newPrice,
-                        Date = DateTime.UtcNow,
-                    };
-                    _dbContext.CryptoPriceHistories.Add(priceHistory);
-                    updateCont++;
+                        asset.IconUrl = await GetIcon(asset.ExternalId);
+                    }
+
+                    var today = DateTime.UtcNow.Date;
+                    if (lastPrices.TryGetValue(asset.Id, out var lastPrice) && lastPrice != null && lastPrice.Date.Date == today)
+                        continue;
+
+                    if (prices != null && prices.TryGetValue(asset.ExternalId, out var priceData) && priceData.TryGetValue("usd", out var newPrice) && newPrice > 0)
+                    {
+                        var priceHistory = new CryptoPriceHistory
+                        {
+                            CryptoAssetId = asset.Id,
+                            Price = newPrice,
+                            Date = DateTime.UtcNow,
+                        };
+                        _dbContext.CryptoPriceHistories.Add(priceHistory);
+                        updateCont++;
+                    }
                 }
+
+                await _dbContext.SaveChangesAsync();
+
+                return updateCont;
             }
+            catch (Exception)
+            {
 
-            await _dbContext.SaveChangesAsync();
-
-            return updateCont;
+                return 0; // Return 0 if an error occurs
+            }
+           
         }
         // Retrieves the latest prices for crypto assets with pagination and search functionality
         public async Task<PagedResult<CryptoAssetDto>> GetPriceAssetGetLatestPrices(int page = 1, int pageSize = 20, string? search = null)
         {
-            
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 20;
-
-            var query = _dbContext.CryptoAssets.AsQueryable();
-
-            // Filtro de búsqueda
-            if (!string.IsNullOrWhiteSpace(search))
+            try
             {
-                query = query.Where(a =>
-                    a.Name.Contains(search) ||
-                    a.Symbol.Contains(search) ||
-                    a.ExternalId.Contains(search)
-                );
-            }
+                if (page < 1) page = 1;
+                if (pageSize < 1) pageSize = 20;
 
-            var totalCount = await _dbContext.CryptoAssets.CountAsync();
-            var filteredCount = await query.CountAsync();
+                var query = _dbContext.CryptoAssets.AsQueryable();
 
-            var items = await query
-                .OrderBy(a => a.    Name)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(asset => new CryptoAssetDto
+                // Filtro de búsqueda
+                if (!string.IsNullOrWhiteSpace(search))
                 {
-                    Id = asset.Id,
-                    Name = asset.Name,
-                    Symbol = asset.Symbol,
-                    ExternalId = asset.ExternalId,
-                    Price = asset.PriceHistory
-                        .OrderByDescending(p => p.Date)
-                        .Select(p => (decimal?)p.Price)
-                        .FirstOrDefault() ?? 0m,
-                    LastUpdated = asset.PriceHistory
-                        .OrderByDescending(p => p.Date)
-                        .Select(p => p.Date)
-                        .FirstOrDefault(),
-                        IconUrl = asset.IconUrl ?? string.Empty,
-                    Trend = GetTrend(
-                        asset.PriceHistory
+                    query = query.Where(a =>
+                        a.Name.Contains(search) ||
+                        a.Symbol.Contains(search) ||
+                        a.ExternalId.Contains(search)
+                    );
+                }
+
+                var totalCount = await _dbContext.CryptoAssets.CountAsync();
+                var filteredCount = await query.CountAsync();
+
+                var items = await query
+                    .OrderBy(a => a.Name)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(asset => new CryptoAssetDto
+                    {
+                        Id = asset.Id,
+                        Name = asset.Name,
+                        Symbol = asset.Symbol,
+                        ExternalId = asset.ExternalId,
+                        Price = asset.PriceHistory
                             .OrderByDescending(p => p.Date)
                             .Select(p => (decimal?)p.Price)
-                            .Take(2)
-                            .ToList()
-                    )
-                })
-                .ToListAsync();
+                            .FirstOrDefault() ?? 0m,
+                        LastUpdated = asset.PriceHistory
+                            .OrderByDescending(p => p.Date)
+                            .Select(p => p.Date)
+                            .FirstOrDefault(),
+                        IconUrl = asset.IconUrl ?? string.Empty,
+                        Trend = GetTrend(
+                            asset.PriceHistory
+                                .OrderByDescending(p => p.Date)
+                                .Select(p => (decimal?)p.Price)
+                                .Take(2)
+                                .ToList()
+                        )
+                    })
+                    .ToListAsync();
 
-            return new PagedResult<CryptoAssetDto>
+                return new PagedResult<CryptoAssetDto>
+                {
+                    TotalCount = filteredCount,
+                    FilteredCount = filteredCount,
+                    Items = items
+                };
+            }
+            catch (Exception)
             {
-                TotalCount = filteredCount,
-                FilteredCount = filteredCount,
-                Items = items
-            };
+                return new PagedResult<CryptoAssetDto>
+                {
+                    TotalCount = 0,
+                    FilteredCount = 0,
+                    Items = new List<CryptoAssetDto>()
+                };
+            }
+            
+            
         }
         // Fetches the list of new coins from CoinGecko and saves them to the database
         private async Task SaveNewCoins()
