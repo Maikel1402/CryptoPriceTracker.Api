@@ -25,6 +25,7 @@
             font-size: 1rem;
             cursor: pointer;
             transition: background 0.2s;
+            float: right;
         }
         #updateBtn:disabled { background: #6c757d; cursor: not-allowed; }
         #statusMessage { margin: 10px 0 15px 0; font-weight: 500; }
@@ -35,7 +36,7 @@
 <h1>Crypto Price Tracker</h1>
 
 <button id="updateBtn" type="button">
-    <span id="btnText"><i class="fa-solid fa-arrow-rotate-right"></i></span>
+    <span id="btnText" title="Refresh Coins"><i class="fa-solid fa-arrow-rotate-right"></i></span>
     <span id="btnSpinner" style="display:none;"><i class="fa fa-spinner fa-spin"></i></span>
 </button>
 <div id="statusMessage"></div>
@@ -76,7 +77,7 @@
             ajax: {
                 url: '/api/crypto/latest-prices',
                       data: function (d) {
-            return d; // Esto asegura que todos los parámetros como `search[value]`, `start`, `length`, etc., se envíen
+            return d; 
         },
                 dataSrc: 'data'
 

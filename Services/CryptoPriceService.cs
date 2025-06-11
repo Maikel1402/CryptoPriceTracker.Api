@@ -19,6 +19,7 @@ namespace CryptoPriceTracker.Api.Services
             _httpClient = httpClient;
         }
         // Updates the prices of crypto assets based on the provided external IDs
+        // I provide these Ids to avoid time out or 406 error from the API.
         public async Task<int> UpdatePricesAsync(List<UpdateDto> externalIds)
         {
             int updateCont = 0;
@@ -157,7 +158,7 @@ namespace CryptoPriceTracker.Api.Services
 
                 var existingIds = new HashSet<string>(cryptoAssets.Select(c => c.ExternalId));
 
-                //Removing already existing coins from the list.
+                //Removing already existing coins from the list this avoid duplicates.
                 // Updated code to handle the null reference issue
                 if (coinInfo != null)
                 {
